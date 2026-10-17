@@ -11,13 +11,19 @@ if(ANDROID AND ANDROID_ABI STREQUAL "arm64-v8a" AND SNX_BUILD_NX AND NOT SNX_TOO
         URL https://github.com/eden-emulator/libadrenotools/archive/8ba23b42d742545b709064d6e2523cdb86de68f5.tar.gz
         URL_HASH SHA256=b62509e200f0ff3af45c96cfbc491abbacc9a6517665d8134b921f294be8b7df
         DOWNLOAD_ONLY YES)
+    include("${CMAKE_CURRENT_LIST_DIR}/patched_copy.cmake")
+    set(snx_adreno_source "${CMAKE_BINARY_DIR}/adrenotools-source")
+    # C++23 no longer supplies these standard declarations through unrelated transitive headers.
+    snx_patched_copy(SOURCE "${snx_adrenotools_source_SOURCE_DIR}" DEST "${snx_adreno_source}"
+        PATCHES "${CMAKE_CURRENT_LIST_DIR}/adrenotools-stdlib.patch"
+        FILES src/driver.cpp d27d068066298feb0f513e2a0833aa3c86a833b17ac2475a8ae5ae694b3c1564)
     # Build the static core explicitly so no CPM cache is patched to insert a submodule.
-    add_library(snx_adrenotools STATIC "${snx_adrenotools_source_SOURCE_DIR}/src/driver.cpp"
-                                     "${snx_adrenotools_source_SOURCE_DIR}/src/bcenabler.cpp")
-    target_include_directories(snx_adrenotools PUBLIC "${snx_adrenotools_source_SOURCE_DIR}/include"
-                                           PRIVATE "${snx_adrenotools_source_SOURCE_DIR}")
+    add_library(snx_adrenotools STATIC "${snx_adreno_source}/src/driver.cpp"
+                                     "${snx_adreno_source}/src/bcenabler.cpp")
+    target_include_directories(snx_adrenotools PUBLIC "${snx_adreno_source}/include"
+                                           PRIVATE "${snx_adreno_source}")
     target_link_libraries(snx_adrenotools PUBLIC android linkernsbypass)
-    add_subdirectory("${snx_adrenotools_source_SOURCE_DIR}/src/hook" "${CMAKE_BINARY_DIR}/adrenotools-hooks")
+    add_subdirectory("${snx_adreno_source}/src/hook" "${CMAKE_BINARY_DIR}/adrenotools-hooks")
     set_target_properties(snx_adrenotools linkernsbypass PROPERTIES POSITION_INDEPENDENT_CODE ON)
     add_library(snx-vulkan SHARED "${PROJECT_SOURCE_DIR}/src/nx/runtime/platform/android_vulkan_proxy.c")
     target_compile_definitions(snx-vulkan PRIVATE VK_NO_PROTOTYPES)
