@@ -78,6 +78,12 @@ jobs:
       - name: Build LLVM for Android
         if: steps.llvm.outputs.cache-hit != 'true'
         run: scripts/android-llvm.sh arm64-v8a "$PWD/android-llvm/arm64-v8a"
+      - name: Save LLVM before building the runtime
+        if: steps.llvm.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: android-llvm/arm64-v8a
+          key: android-llvm-arm64-v8a-${{ hashFiles('scripts/android-llvm.sh') }}-28.2.13676358
       - name: Build the complete APK
         run: |
           JAVA_HOME=$JAVA_HOME_21_X64 scripts/android-apk.sh "$PWD/build/android" "$PWD/android-llvm" arm64-v8a
