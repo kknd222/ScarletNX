@@ -62,6 +62,9 @@ else()
     list(APPEND platform runtime/platform/plat_posix.c)
 endif()
 snx_component(platform ${platform})
+if(ANDROID)
+    target_sources(snx_platform PRIVATE runtime/platform/android_vulkan.c)
+endif()
 
 snx_component(shader gpu/shader/shader.c gpu/shader/decode.c gpu/shader/corpus.c
                      gpu/shader/spirv_translate.c gpu/shader/spirv_compute.c gpu/shader/spirv_emit.c)
@@ -76,6 +79,10 @@ if(ANDROID)
     # the app (dist/android): its game activity loads libscarletnx.so and calls its main; the menu runs the driver as
     # libscarletnx-run.so, an executable named for the app's libraries folder, which takes only lib*.so
     add_library(scarletnx SHARED runtime/entry.c)
+    if(TARGET snx-vulkan)
+        target_compile_definitions(snx_platform PRIVATE SNX_ADRENOTOOLS)
+        add_dependencies(scarletnx snx-vulkan)
+    endif()
     # FFmpeg's assembly reaches its tables PC-relative, as its own shared libraries allow with this
     target_link_options(scarletnx PRIVATE -Wl,-Bsymbolic)
     add_executable(scarletnx-run runtime/platform/android_run.c)

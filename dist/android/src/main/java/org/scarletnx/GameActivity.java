@@ -8,6 +8,11 @@ import org.libsdl.app.SDLSurface;
 
 /** A game: the runtime's main in libscarletnx.so, with the menu's arguments */
 public class GameActivity extends SDLActivity {
+    /** SDL's native thread reads the selection once before creating its Vulkan window. */
+    public String[] gpuDriverConfig() {
+        return GpuDriver.config(this);
+    }
+
     @Override
     protected String[] getLibraries() {
         return new String[] {"scarletnx"};

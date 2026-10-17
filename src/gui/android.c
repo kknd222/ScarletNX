@@ -121,6 +121,7 @@ int gui_android_share(const char* path, char* message, size_t size) {
     return ok;
 }
 int gui_android_background(char* message, size_t size) { return call("toBack", "()V", NULL, message, size); }
+int gui_android_gpu_driver(char* message, size_t size) { return call("gpuDriver", "()V", NULL, message, size); }
 
 static SDL_DialogFileCallback folder_done;
 static void* folder_data;

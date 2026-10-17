@@ -185,6 +185,9 @@ static const char* const items[] = {"Load Switch NSP/XCI/NRO",
                                     "Setup device keys",
                                     "Settings",
                                     "Share log",
+#ifdef SDL_PLATFORM_ANDROID
+                                    "GPU driver",
+#endif
                                     "Exit"};
 #define GUI_RECENT_SHOWN 3 /* the recent games Games shows before a row that shows the rest */
 /* what the screens say to press: a phone has a finger, the back button and the system's file picker, nothing to drop;
@@ -4268,6 +4271,9 @@ static void menu_key(App* app, GuiKey key) {
     switch (gui_menu_key(&app->menu, key)) {
         case GUI_MENU_SETTINGS: open_settings(app); break;
         case GUI_MENU_LOG: share_log(app); break;
+#ifdef SDL_PLATFORM_ANDROID
+        case GUI_MENU_GPU_DRIVER: gui_android_gpu_driver(app->message, sizeof app->message); break;
+#endif
         default: break;
     }
     if (key == GUI_CANCEL || (key == GUI_SELECT && pick_screen(app))) app->message[0] = 0;

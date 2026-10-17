@@ -120,6 +120,8 @@ public class MainActivity extends SDLActivity {
     @Override
     protected void onActivityResult(int code, int result, Intent data) {
         super.onActivityResult(code, result, data);
+        if (code == GpuDriver.PICK_DRIVER && result == RESULT_OK && data != null && data.getData() != null)
+            GpuDriver.install(this, data.getData());
         if (code == ASKED_BATTERY) askBackground();
         if (code == PICKED_FOLDER) {
             Uri tree = result == RESULT_OK && data != null ? data.getData() : null;
@@ -130,6 +132,11 @@ public class MainActivity extends SDLActivity {
     /** src/gui/android.c: the system's folder picker, SDL having none here; its answer goes to folderPicked */
     public void pickFolder() {
         startActivityForResult(new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE), PICKED_FOLDER);
+    }
+
+    /** src/gui/android.c: import a driver ZIP or return to the system driver. */
+    public void gpuDriver() {
+        GpuDriver.show(this);
     }
 
     /** src/gui/android.c: the folder picked, its tree's URI as UTF-8; null for none */

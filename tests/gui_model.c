@@ -53,6 +53,10 @@ int main(void) {
     gui_menu_key(&menu, GUI_DOWN);
     assert(gui_menu_key(&menu, GUI_SELECT) == GUI_MENU_LOG && menu.selected == GUI_LOG && !menu.quit);
     gui_menu_key(&menu, GUI_DOWN);
+#ifdef __ANDROID__
+    assert(gui_menu_key(&menu, GUI_SELECT) == GUI_MENU_GPU_DRIVER && menu.selected == GUI_GPU_DRIVER && !menu.quit);
+    gui_menu_key(&menu, GUI_DOWN);
+#endif
     gui_menu_key(&menu, GUI_SELECT);
     assert(menu.quit);
 

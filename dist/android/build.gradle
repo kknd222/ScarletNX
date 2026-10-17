@@ -23,6 +23,7 @@ android {
         java.srcDir new File(stage, 'java')
         jniLibs.srcDir new File(stage, 'lib')
         res.srcDir new File(stage, 'res')
+        assets.srcDir new File(stage, 'share/licenses')
     }
     // extracted into the app's libraries folder, where the menu runs the driver from
     packaging.jniLibs.useLegacyPackaging = true

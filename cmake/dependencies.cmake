@@ -98,6 +98,9 @@ if(SNX_BUILD_NX AND NOT SNX_TOOLS_ONLY AND NOT SNX_HACTOOL_ONLY)
 endif()
 
 set(SNX_SDL3_FROM_SOURCE OFF)
+if(ANDROID AND NOT SNX_HACTOOL_ONLY)
+    include("${CMAKE_CURRENT_LIST_DIR}/android_vulkan.cmake")
+endif()
 if((SNX_BUILD_NX AND NOT SNX_TOOLS_ONLY AND NOT SNX_HACTOOL_ONLY) OR SNX_BUILD_GUI OR SNX_BUILD_3DS)
     # Prefer a compatible system package. CPM handles the pinned static fallback and user overrides.
     CPMFindPackage(NAME SDL3 VERSION 3.4.18 FIND_PACKAGE_ARGUMENTS CONFIG

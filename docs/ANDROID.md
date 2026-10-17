@@ -38,6 +38,43 @@ fingers reach a game's touch screen (*Touch screen*, in the game's menu or the S
 mouse). The buttons and sticks are on the screen, over the game ([USAGE](USAGE.md#on-screen-controls)), and a gamepad
 works beside them; the menu's *On-screen controls* item hides them.
 
+## Custom GPU drivers (Switch runtime)
+
+On Android 9+ arm64, **GPU driver** on the main menu imports an Eden/Turnip-style ZIP with
+`meta.json` at its root. It must name `name`, `minApi` and `libraryName`; the named library must
+be an arm64 ELF shared library in the ZIP's root. Choose a driver that supports the phone's
+Adreno GPU. Importing does not prove that its Vulkan features meet a game's requirements.
+The next Switch game uses the selection. **Use system driver** resets it for the next game.
+The 3DS runtime and headless runs retain their existing loader paths.
+
+The ZIP is extracted into an immutable folder under the app's private files, never shared
+storage. Selection is written atomically and read in the new game's process. Old installations
+are retained so a running game's library files are never replaced. Failed imports preserve the
+previous selection. Imports are bounded to 128 entries / 128 MiB expanded and reject path escapes.
+
+The loader uses the same libadrenotools revision as Eden's dependency manifest at implementation
+time (`8ba23b42d742545b709064d6e2523cdb86de68f5`) and liblinkernsbypass
+`aa3975893d83ef1bc84c321ec60c65fbf1287887`, both BSD-2-Clause. On arm64 the APK additionally
+contains `libsnx-vulkan.so`, `libmain_hook.so`, `libhook_impl.so`, `libfile_redirect_hook.so` and
+`libgsl_alloc_hook.so`. Keep `useLegacyPackaging = true`: the hooks need `nativeLibraryDir`.
+These are loaded only when a custom driver is selected; older Android and x86_64 keep the system path.
+
+Before the first Vulkan window, SDL loads the proxy by its absolute installed path. The proxy
+forwards `vkGetInstanceProcAddr` to libadrenotools' isolated loader. SDL's Android surface code
+and Volk therefore use the same dispatch entry. The proxy is deliberately not linked into the
+runtime, where Volk defines a variable with the same name. Handles stay live until the game
+process exits, including when the Android surface is recreated.
+
+If the custom library cannot open, or SDL rejects its instance extensions, the runtime logs
+the failure and lets SDL load the system driver. This recovery covers loader initialization;
+a later GPU enumeration/device-creation failure still reports the runtime's Vulkan error. Select
+**Use system driver** before launching again. Driver crashes cannot be recovered inside the process.
+
+Device validation still required: compare system/custom logs on an Adreno phone, verify Vulkan
+1.3, physical-device enumeration, logical-device creation, presentation, background/resume and
+return to the system driver. No Turnip binary is bundled, and there is no claim of GT Neo5 SE
+compatibility until that device test passes.
+
 ## Keys
 
 *Setup device keys* copies `prod.keys` into the app's own files, as `.switch/prod.keys` in its `HOME`, and its screen
@@ -51,6 +88,13 @@ the data folder once the app has *All files access* (it asks when it starts), an
 the app's own files. The *Setup device keys* screen shows only the keys it installed, so it does not name these.
 
 ## Building
+
+The fork's **Android Turnip APK** workflow builds only arm64, first compiling the loader and JNI
+bridge with the NDK, then the complete runtime and APK. Its artifact is `ScarletNX-Turnip-arm64`.
+The same workflow preserves complete source snapshots in separate branches of this repository:
+`reference/eden-e0d47f2`, `reference/libadrenotools-8ba23b4` and
+`reference/liblinkernsbypass-aa39758`. Each snapshot records its original upstream commit in its
+commit message. These branches are reference material, not merged emulator runtimes.
 
 LLVM's libraries for each ABI, once (about 10 minutes each on 12 cores):
 

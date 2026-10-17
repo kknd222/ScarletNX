@@ -1,0 +1,113 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright 2026 the ScarletNX contributors
+name: Android Turnip APK
+on:
+  push:
+    branches: [android/eden-turnip-loader]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: android-turnip-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  references:
+    name: Preserve Eden reference source
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Preserve exact reference source trees in separate branches
+        shell: bash
+        run: |
+          set -euo pipefail
+          mirror() {
+            local source=$1 commit=$2 branch=$3
+            if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+              echo "Reference branch already exists: $branch"
+              return
+            fi
+            git fetch --no-tags --depth=1 "$source" "$commit"
+            # An orphan snapshot preserves the complete tree without pushing a shallow upstream history.
+            local snapshot
+            snapshot=$(printf 'Reference source snapshot\n\nSource: %s\nUpstream commit: %s\n' "$source" "$commit" |
+              git -c user.name=kknd222 -c user.email=13957020+kknd222@users.noreply.github.com commit-tree 'FETCH_HEAD^{tree}')
+            git push origin "$snapshot:refs/heads/$branch"
+          }
+          mirror https://git.eden-emu.dev/eden-emu/eden.git e0d47f2790e3f758fa2188926a0bb2f56af6b310 reference/eden-e0d47f2
+          mirror https://github.com/eden-emulator/libadrenotools.git 8ba23b42d742545b709064d6e2523cdb86de68f5 reference/libadrenotools-8ba23b4
+          mirror https://github.com/bylaws/liblinkernsbypass.git aa3975893d83ef1bc84c321ec60c65fbf1287887 reference/liblinkernsbypass-aa39758
+  android:
+    name: Build arm64 APK
+    runs-on: ubuntu-26.04
+    timeout-minutes: 180
+    env:
+      ANDROID_NDK_ROOT: /usr/local/lib/android/sdk/ndk/28.2.13676358
+      CMAKE_BUILD_PARALLEL_LEVEL: 4
+      CPM_SOURCE_CACHE: ${{ github.workspace }}/.cache/cpm
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/cache@v5
+        with:
+          path: .cache/cpm
+          key: turnip-cpm-${{ hashFiles('cmake/dependencies.cmake', 'cmake/android_vulkan.cmake', 'tests/android/CMakeLists.txt') }}
+      - uses: actions/cache@v5
+        id: llvm
+        with:
+          path: android-llvm/arm64-v8a
+          key: android-llvm-arm64-v8a-${{ hashFiles('scripts/android-llvm.sh') }}-28.2.13676358
+      - name: Install Android build tools
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;28.2.13676358" "platforms;android-36" "build-tools;36.0.0"
+          sudo apt-get update
+          sudo apt-get install -y nasm ccache
+      - name: Test driver ZIP handling
+        run: |
+          mkdir -p build/driver-java
+          javac -d build/driver-java dist/android/src/main/java/org/scarletnx/DriverPackage.java tests/android/DriverPackageTest.java
+          java -cp build/driver-java org.scarletnx.DriverPackageTest
+      - name: Compile the loader, hooks and JNI bridge with the NDK
+        run: |
+          cmake -S tests/android -B build/driver-check -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_ROOT/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-21
+          cmake --build build/driver-check --target snx-vulkan snx-driver-jni
+      - name: Build LLVM for Android
+        if: steps.llvm.outputs.cache-hit != 'true'
+        run: scripts/android-llvm.sh arm64-v8a "$PWD/android-llvm/arm64-v8a"
+      - name: Build the complete APK
+        run: |
+          JAVA_HOME=$JAVA_HOME_21_X64 scripts/android-apk.sh "$PWD/build/android" "$PWD/android-llvm" arm64-v8a
+          cp build/android/stage/gradle/outputs/apk/debug/ScarletNX-debug.apk ScarletNX-Turnip-arm64.apk
+      - name: Check the APK and Vulkan hook libraries
+        shell: bash
+        run: |
+          set -euo pipefail
+          unzip -q ScarletNX-Turnip-arm64.apk 'lib/*' -d build/apk-check
+          readelf=$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf
+          libs=build/apk-check/lib/arm64-v8a
+          for name in libmain.so libscarletnx.so libsnx-vulkan.so libmain_hook.so libhook_impl.so libfile_redirect_hook.so libgsl_alloc_hook.so; do
+            test -s "$libs/$name"
+          done
+          for lib in "$libs"/*.so; do
+            "$readelf" -h "$lib" | grep -q AArch64
+            for needed in $("$readelf" -d "$lib" | sed -n 's/.*(NEEDED).*\[\(.*\)\]/\1/p'); do
+              case "$needed" in
+                libc.so|libm.so|libdl.so|liblog.so|libandroid.so|libz.so|libEGL.so|libGLESv1_CM.so|libGLESv2.so|libOpenSLES.so) ;;
+                *) test -f "$libs/$needed" ;;
+              esac
+            done
+          done
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose ScarletNX-Turnip-arm64.apk
+          sha256sum ScarletNX-Turnip-arm64.apk > ScarletNX-Turnip-arm64.apk.sha256
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ScarletNX-Turnip-arm64
+          path: |
+            ScarletNX-Turnip-arm64.apk
+            ScarletNX-Turnip-arm64.apk.sha256
+          if-no-files-found: error
+          retention-days: 30

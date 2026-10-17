@@ -34,6 +34,7 @@
 #include "common/utilities/build_info.h"
 #ifdef __ANDROID__
 #include <jni.h>
+#include "nx/runtime/platform/android_vulkan.h"
 #endif
 
 static SDL_Window* g_win;
@@ -278,6 +279,9 @@ void video_init(const char* title) {
     SDL_SetHint(SDL_HINT_MOUSE_TOUCH_EVENTS, "0");
     SDL_SetHint(SDL_HINT_PEN_MOUSE_EVENTS, "0");
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) fatal("SDL could not start its video: %s", SDL_GetError());
+#ifdef __ANDROID__
+    snx_android_vulkan_prepare();
+#endif
     gamepad_scan();
     /* SDL subsystem initialization belongs to the main thread, before the guest can open audout sessions. */
     g_audio_ready = SDL_InitSubSystem(SDL_INIT_AUDIO);
